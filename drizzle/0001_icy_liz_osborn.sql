@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "unique_match_idx" ON "matches" USING btree ("sport","home_team","away_team","start_time","end_time");
