@@ -46,7 +46,7 @@ matchRouter.post("/", async (req, res) => {
     });
   }
 
-  const { startTime, endTime, homeScore, awayScore } = parsed;
+  const { data: {startTime, endTime, homeScore, awayScore}, } = parsed;
   try {
     const [createdMatch] = await db
       .insert(matches)
@@ -72,6 +72,7 @@ matchRouter.post("/", async (req, res) => {
 
     res.status(500).json({
       error: "Failed to create match.",
+      details: JSON.stringify(error),
     });
   }
 });
