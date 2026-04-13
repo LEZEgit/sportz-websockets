@@ -46,9 +46,11 @@ matchRouter.post("/", async (req, res) => {
     });
   }
 
-  const { data: {startTime, endTime, homeScore, awayScore}, } = parsed;
+  const {
+    data: { startTime, endTime, homeScore, awayScore },
+  } = parsed;
   try {
-    const [createdMatch] = await db
+    const [event] = await db
       .insert(matches)
       .values({
         ...parsed.data,
@@ -60,7 +62,20 @@ matchRouter.post("/", async (req, res) => {
       })
       .returning();
 
-    res.status(201).json({ data: createdMatch });
+    if (res.app.locals.broadcastMatchCreated) {
+      if (res.app.locals.broadcastMatchCreated) {
+        try {
+          res.app.locals.broadcastMatchCreated(event);
+        } catch (broadcastError) {
+          console.error(
+            "Failed to broadcast match_created event",
+            broadcastError,
+          );
+        }
+      }
+    }
+
+    res.status(201).json({ data: event });
   } catch (error) {
     // Handle unique constraint violation (duplicate match)
     if (error.cause?.code === "23505") {
@@ -72,7 +87,6 @@ matchRouter.post("/", async (req, res) => {
 
     res.status(500).json({
       error: "Failed to create match.",
-      details: JSON.stringify(error),
     });
   }
 });
