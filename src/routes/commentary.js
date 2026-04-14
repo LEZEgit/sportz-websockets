@@ -7,7 +7,7 @@ import {
   createCommentarySchema as createCommentaryValidation,
 } from "../validation/commentary.js";
 import { db } from "../db/db.js";
-import { commentary } from "../db/schema.js";
+import { commentary, matches } from "../db/schema.js";
 
 export const commentaryRouter = Router({ mergeParams: true });
 
@@ -19,7 +19,7 @@ commentaryRouter.get("/", async (req, res) => {
   if (!paramsParsed.success) {
     return res.status(400).json({
       error: "Invalid match ID.",
-      details: JSON.stringify(paramsParsed.error.issues),
+      details: paramsParsed.error.issues,
     });
   }
 
@@ -28,7 +28,7 @@ commentaryRouter.get("/", async (req, res) => {
   if (!queryParsed.success) {
     return res.status(400).json({
       error: "Invalid query parameters.",
-      details: JSON.stringify(queryParsed.error.issues),
+      details: queryParsed.error.issues,
     });
   }
 
@@ -47,7 +47,7 @@ commentaryRouter.get("/", async (req, res) => {
     console.error("Error fetching commentaries:", error);
     res.status(500).json({
       error: "Failed to fetch commentaries.",
-      details: JSON.stringify(error),
+      //   details: JSON.stringify(error),
     });
   }
 });
@@ -58,7 +58,7 @@ commentaryRouter.post("/", async (req, res) => {
   if (!paramsParsed.success) {
     return res.status(400).json({
       error: "Invalid match ID.",
-      details: JSON.stringify(paramsParsed.error.issues),
+      details: paramsParsed.error.issues,
     });
   }
 
@@ -67,11 +67,25 @@ commentaryRouter.post("/", async (req, res) => {
   if (!bodyParsed.success) {
     return res.status(400).json({
       error: "Invalid commentary data.",
-      details: JSON.stringify(bodyParsed.error.issues),
+      details: bodyParsed.error.issues,
     });
   }
 
   try {
+    // Check if match exists
+    const matchExists = await db
+      .select({ id: matches.id })
+      .from(matches)
+      .where(eq(matches.id, paramsParsed.data.id))
+      .limit(1);
+
+    if (matchExists.length === 0) {
+      return res.status(404).json({
+        error: "Match not found.",
+        details: `No match with ID ${paramsParsed.data.id} exists.`,
+      });
+    }
+
     const [createdCommentary] = await db
       .insert(commentary)
       .values({
@@ -85,7 +99,7 @@ commentaryRouter.post("/", async (req, res) => {
     console.error("Error creating commentary:", error);
     res.status(500).json({
       error: "Failed to create commentary.",
-      details: JSON.stringify(error),
+      //   details: JSON.stringify(error),
     });
   }
 });
