@@ -1,4 +1,5 @@
 import { WebSocket, WebSocketServer } from "ws";
+import { wsArcjet } from "../config/arcjet.js";
 
 function sendJson(socket, payload) {
   if (socket.readyState !== WebSocket.OPEN) return;
@@ -22,15 +23,51 @@ export function attachWebSocketServer(server) {
     maxPayload: 1024 * 1024, // (1mb)
   });
 
-  wss.on("connection", (socket, request) => {
+  wss.on("connection", async (socket, req) => {
     // socket represents the active connection, the actual duplex pipe connecting the server and the browser tab that requested an upgrade
     // it is unique for each connection
 
     // can add userinfo to the socket object like socket.userId or socket.isAdFree like we did for req.user so that we dont have to look up into the db for each request
+
+    if(wsArcjet){
+        try {
+           const decision = await wsArcjet.protect(req); 
+
+           if(decision.isDenied()){
+            const code = decision.reason.isRateLimit() ? 1013:1008;
+
+            const reason = decision.reason.isRateLimit() ? 'Rate limit exceeded' : 'Access Denied';
+
+            socket.close(code, reason);
+            return;
+           }
+        } catch (e) {
+            console.error("WS connection error", e);
+            socket.close(1011, 'Server security error');
+            return;
+        }
+    }
+
+    socket.isAlive = true;
+    socket.on("pong", () => {
+      socket.isAlive = true;
+    });
+
     sendJson(socket, { type: "welcome" });
 
     socket.on("error", console.error);
   });
+
+  const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (ws.isAlive === false) return ws.terminate();
+
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on("close", () => clearInterval(interval));
 
   function broadcastMatchCreated(match) {
     broadcast(wss, { type: "match_created", data: match });
